@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 
 const INITIAL_MULTIPLE_MODE = 'multi';
 const INITIAL_KEYBOARD_MODE = 'discountMode';
@@ -40,10 +40,12 @@ const INITIAL_ARR = [
 function App() {
 
   const [comms, setComms] = useState(INITIAL_ARR);
+  const [memoComms, setMemoComms] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [uniformContent, setUniformContent] = useState('');
   const [keyboardMode, setKeyboardMode] = useState(INITIAL_KEYBOARD_MODE);
   const [multipleMode, setMultipleMode] = useState(INITIAL_MULTIPLE_MODE);
+
 
   const onAmountChange = (e, itemId) => {
     if (Number(e.target.value) < 1) return;
@@ -67,7 +69,7 @@ function App() {
   };
 
   // When use Redux this can be as payload to edit item.
-  const calcCommTotal = comm => {
+  const calcCommTotal = useCallback(comm => {
     let total = comm.price * comm.amount;
     if ( comm.discount ) {
       const discountMode = verifyDiscountString(comm.discount);
@@ -76,7 +78,7 @@ function App() {
       total -= (discountAmount * discountMultiple);
     }
     return { ...comm, total };
-  };
+  }, [multipleMode]);
 
   const onInputClick = e => {
     setUniformContent('');
@@ -92,11 +94,22 @@ function App() {
 
   const onKeyboardCheckboxClick = e => {
     setKeyboardMode(e.target.name);
+    setUniformContent('');
   };
 
   const onMultipleCheckboxClick = e => {
     setMultipleMode(e.target.name);
+    setUniformContent('');
+    console.log('change');
+    setMemoComms([ ...comms ]);
   };
+
+  useEffect(() => {
+    if(memoComms.length > 0) {
+      const reCalculateComms = memoComms.map(comm => calcCommTotal(comm));
+      setComms(reCalculateComms);
+    }
+  }, [multipleMode, memoComms, calcCommTotal]);
 
   const onUniformContentChange = (e, keyboardMode) => {
     if ( selectedIds.length <= 0 ) return alert('請先勾選商品');
@@ -225,8 +238,6 @@ function App() {
       );
     })
   };
-  
-  console.log(comms);
 
   return (
     <div className="App">
@@ -263,7 +274,7 @@ function App() {
       <div>
         <input
           type="checkbox"
-          name="multiple"
+          name="multi"
           checked={multipleMode === 'multi'}
           onChange={onMultipleCheckboxClick}
         />
