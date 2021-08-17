@@ -9,7 +9,8 @@ const INITIAL_ARR = [
     price: 100,
     amount: 1,
     discount: '',
-    total: 100
+    total: 100,
+    discountable: false,
   },
   {
     ID: 'CM2',
@@ -17,7 +18,8 @@ const INITIAL_ARR = [
     price: 200,
     amount: 1,
     discount: '',
-    total: 200
+    total: 200,
+    discountable: true,
   },
   {
     ID: 'CM3',
@@ -25,7 +27,8 @@ const INITIAL_ARR = [
     price: 300,
     amount: 1,
     discount: '',
-    total: 300
+    total: 300,
+    discountable: true,
   },
   {
     ID: 'CM4',
@@ -33,7 +36,8 @@ const INITIAL_ARR = [
     price: 400,
     amount: 1,
     discount: '',
-    total: 400
+    total: 400,
+    discountable: true,
   },
 ];
 
@@ -42,6 +46,7 @@ function App() {
   const [comms, setComms] = useState(INITIAL_ARR);
   const [memoComms, setMemoComms] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [activeCommId, setActiveCommId] = useState(null);
   const [uniformContent, setUniformContent] = useState('');
   const [keyboardMode, setKeyboardMode] = useState(INITIAL_KEYBOARD_MODE);
   const [multipleMode, setMultipleMode] = useState(INITIAL_MULTIPLE_MODE);
@@ -53,10 +58,12 @@ function App() {
   };
 
   const onDiscountChange = (e, item) => {
+    if ( !item.discountable ) return alert('警告: 此為不可折扣的商品');
     const discountMode = verifyDiscountString(e.target.value);
-    if (!discountMode && e.target.value !== '') return;
+    if ( !discountMode && e.target.value !== '' ) return;
     const discountAmount = convertDiscount(item, discountMode, e.target.value);
-    if ( (item.price * item.amount) > discountAmount ) onInputChange(e, item.ID);
+    if ( (item.price * item.amount) > discountAmount ) { onInputChange(e, item.ID) }
+    else { alert('警告: 折扣額度大於部分商品') };
   };
 
   const onInputChange = (e, itemId) => {
@@ -79,6 +86,10 @@ function App() {
     }
     return { ...comm, total };
   }, [multipleMode]);
+
+  const onCommClick = ID => {
+    setActiveCommId(ID);
+  };
 
   const onInputClick = e => {
     setUniformContent('');
@@ -111,15 +122,22 @@ function App() {
     }
   }, [multipleMode, memoComms, calcCommTotal]);
 
+  const isIllegalAmountStr = inputString => {
+    return ( inputString !== '' && ( isNaN(inputString) || Number(inputString) <= 0 ));
+  };
+
   const onUniformContentChange = (e, keyboardMode) => {
-    if ( selectedIds.length <= 0 ) return alert('請先勾選商品');
+    if ( selectedIds.length <= 0 && !activeCommId ) return alert('提醒: 請先選擇商品');
+    const isCommsChecked = ( selectedIds.length > 0 );
     let newComms = [];
     switch (keyboardMode) {
       case 'discountMode':
-        newComms = handelDiscountUnify(e);
+        newComms = isCommsChecked ? handelDiscountUnify(e) : handleDiscountModify(e);
         break;
       case 'amountMode':
-        newComms = handleAmountUnify(e);
+        if (isIllegalAmountStr(e.target.value)) return;
+        setUniformContent(e.target.value);
+        newComms = isCommsChecked ? handleAmountUnify(e) : handleAmountModify(e);
         break;
       default:
         newComms = [ ...comms ];
@@ -131,30 +149,62 @@ function App() {
     const discountMode = verifyDiscountString(e.target.value);
     const newComms = [];
     let isDiscountExcess = false;
+    let isContainUndiscountable = false;
     comms.findIndex(comm => {
       if ( selectedIds.includes(comm.ID) ) {
         const discountAmount = convertDiscount(comm, discountMode, e.target.value);
-        if ((comm.price * comm.amount) < discountAmount) {
+        if ( !comm.discountable ) {
+          isContainUndiscountable = true;
+          alert('警告: 包含無法折扣的商品');
+          return true }
+        if ((comm.price * comm.amount) <= discountAmount) {
           isDiscountExcess = true;
+          alert('警告: 折扣額度大於部分商品');
           return true }
         newComms.push(calcCommTotal({ ...comm, discount: e.target.value }));
         return false } 
       else {
         newComms.push(comm);
-        return false;
-      }
+        return false }
     });
-    if ( isDiscountExcess ) { return comms } 
+    if ( isContainUndiscountable || isDiscountExcess ) { return comms } 
     else {
       setUniformContent(e.target.value);
       return newComms }
   };
 
+  const handleDiscountModify = e => {
+    console.log('discount modify');
+    const discountMode = verifyDiscountString(e.target.value);
+    if (!discountMode && e.target.value !== '') return;
+    return comms.map(comm => {
+      if ( comm.ID === activeCommId ) {
+        if ( !comm.discountable ) {
+          alert('警告: 此為不可折扣的商品');
+          return comm }
+        const discountAmount = convertDiscount(comm, discountMode, e.target.value);
+        if ( (comm.price * comm.amount) > discountAmount ) {
+          setUniformContent(e.target.value);
+          return calcCommTotal({ ...comm, discount: e.target.value })}
+        else { 
+          alert('警告: 折扣額度大於部分商品');
+          return comm }}
+      else { return comm }
+    });
+  };
+
   const handleAmountUnify = e => {
-    setUniformContent(e.target.value);
     return comms.map(comm => {
       return selectedIds.includes(comm.ID)
-        ? calcCommTotal({ ...comm, amount: Number(e.target.value) })
+        ? calcCommTotal({ ...comm, amount: Number(e.target.value) || 1 })
+        : comm;
+    })
+  };
+
+  const handleAmountModify = e => {
+    return comms.map(comm => {
+      return comm.ID === activeCommId
+        ? calcCommTotal({ ...comm, amount: Number(e.target.value) || 1 })
         : comm;
     })
   };
@@ -199,10 +249,11 @@ function App() {
 
   const renderedItems = (items = []) => {
     return items.map(item => {
+      const activeBg = item.ID === activeCommId ? '#cceefb' : null ;
       const selectedBg = selectedIds.includes(item.ID) ? '#eeeeee' : null ;
 
       return (
-        <div key={item.ID} style={{ background: selectedBg }}>
+        <div key={item.ID} style={{ background: activeBg || selectedBg }} onClick={() => onCommClick(item.ID)}>
           <input
             type="checkbox"
             checked={selectedIds.includes(item.ID)}
@@ -234,6 +285,7 @@ function App() {
             />
           </span>
           <span>小計:&nbsp; {item.total}</span>
+          {item.discountable ? null : <small> 不可折扣</small>}
         </div>
       );
     })
