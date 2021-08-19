@@ -43,8 +43,8 @@ const INITIAL_ARR = [
 
 function App() {
 
-  const [comms, setComms] = useState(INITIAL_ARR);
-  const [memoComms, setMemoComms] = useState([]);
+  const [orderComms, setOrderComms] = useState(INITIAL_ARR);
+  const [memoOrderComms, setMemoOrderComms] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [activeCommId, setActiveCommId] = useState(null);
   const [uniformContent, setUniformContent] = useState('');
@@ -67,12 +67,12 @@ function App() {
   };
 
   const onInputChange = (e, itemId) => {
-    const processedComms = comms.map(comm => {
+    const processedComms = orderComms.map(comm => {
       return (comm.ID === itemId)
         ? calcCommTotal({ ...comm, [e.target.name]: e.target.value })
         : comm;
     });
-    setComms(processedComms);
+    setOrderComms(processedComms);
   };
 
   // When use Redux this can be as payload to edit item.
@@ -108,19 +108,19 @@ function App() {
     setUniformContent('');
   };
 
+  // -切換總和或單價折扣，並以useEffect刷新項目金額總和-
   const onMultipleCheckboxClick = e => {
     setMultipleMode(e.target.name);
     setUniformContent('');
-    console.log('change');
-    setMemoComms([ ...comms ]);
+    setMemoOrderComms([ ...orderComms ]);
   };
 
   useEffect(() => {
-    if(memoComms.length > 0) {
-      const reCalculateComms = memoComms.map(comm => calcCommTotal(comm));
-      setComms(reCalculateComms);
+    if(memoOrderComms.length > 0) {
+      const reCalculateComms = memoOrderComms.map(comm => calcCommTotal(comm));
+      setOrderComms(reCalculateComms);
     }
-  }, [multipleMode, memoComms, calcCommTotal]);
+  }, [multipleMode, memoOrderComms, calcCommTotal]);
 
   const isIllegalAmountStr = inputString => {
     return ( inputString !== '' && ( isNaN(inputString) || Number(inputString) <= 0 ));
@@ -140,17 +140,18 @@ function App() {
         newComms = isCommsChecked ? handleAmountUnify(e) : handleAmountModify(e);
         break;
       default:
-        newComms = [ ...comms ];
+        newComms = [ ...orderComms ];
     };
-    setComms(newComms);
+    setOrderComms(newComms);
   };
 
+  // -勾選多筆折扣處理-
   const handelDiscountUnify = e => {
     const discountMode = verifyDiscountString(e.target.value);
     const newComms = [];
     let isDiscountExcess = false;
     let isContainUndiscountable = false;
-    comms.findIndex(comm => {
+    orderComms.findIndex(comm => {
       if ( selectedIds.includes(comm.ID) ) {
         const discountAmount = convertDiscount(comm, discountMode, e.target.value);
         if ( !comm.discountable ) {
@@ -167,17 +168,17 @@ function App() {
         newComms.push(comm);
         return false }
     });
-    if ( isContainUndiscountable || isDiscountExcess ) { return comms } 
+    if ( isContainUndiscountable || isDiscountExcess ) { return orderComms } 
     else {
       setUniformContent(e.target.value);
       return newComms }
   };
 
+  // -勾選單筆折扣處理-
   const handleDiscountModify = e => {
-    console.log('discount modify');
     const discountMode = verifyDiscountString(e.target.value);
     if (!discountMode && e.target.value !== '') return;
-    return comms.map(comm => {
+    return orderComms.map(comm => {
       if ( comm.ID === activeCommId ) {
         if ( !comm.discountable ) {
           alert('警告: 此為不可折扣的商品');
@@ -193,22 +194,25 @@ function App() {
     });
   };
 
+  // -勾選多筆數量處理-
   const handleAmountUnify = e => {
-    return comms.map(comm => {
+    return orderComms.map(comm => {
       return selectedIds.includes(comm.ID)
         ? calcCommTotal({ ...comm, amount: Number(e.target.value) || 1 })
         : comm;
     })
   };
 
+  // -勾選單筆數量處理-
   const handleAmountModify = e => {
-    return comms.map(comm => {
+    return orderComms.map(comm => {
       return comm.ID === activeCommId
         ? calcCommTotal({ ...comm, amount: Number(e.target.value) || 1 })
         : comm;
     })
   };
 
+  // -驗證折扣字串-
   const verifyDiscountString = (discountString) => {
     const percentTest = new RegExp('^\\d+%$').test(discountString);
     const amountTest = new RegExp('^\\d*\\d$').test(discountString);
@@ -217,6 +221,7 @@ function App() {
     return '';
   };
 
+  // -計算折扣額度-
   const convertDiscount = (comm, mode, discountString) => {
     let discountNum = 0;
     if ( mode === 'percentage' ) { discountNum = Number(discountString.slice(0, -1)) * comm.price / 100 }
@@ -294,7 +299,7 @@ function App() {
   return (
     <div className="App">
       <div>
-        {renderedItems(comms)}
+        {renderedItems(orderComms)}
       </div>
 
       <br />
